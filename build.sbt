@@ -46,7 +46,11 @@ libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-dsl" % "1.0.0-M23",
   "org.http4s" %% "http4s-blaze-server" % "1.0.0-M23",
   "org.http4s" %% "http4s-blaze-client" % "1.0.0-M23",
-  
+
+  "org.scalactic" %% "scalactic" % "3.2.9",
+  "org.scalatest" %% "scalatest" % "3.2.9" % "test",
+  "org.scalatest" %% "scalatest-funspec" % "3.2.9" % "test",
+
   compilerPlugin("org.typelevel" %% "kind-projector" % "0.12.0" cross CrossVersion.full)
 )
 
