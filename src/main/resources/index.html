@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simulation</title>
+    <style>
+        canvas { border: 1px solid #bbbbbb }
+    </style>
+    <script>
+      function load() {
+        var x = 100;
+        var y = 25;
+        var px = 10;
+        var height = 10;
+        var width = 10;
+        var canvas = document.getElementById("elevator");
+        var ctx = canvas.getContext("2d");
+
+        ctx.width = 1280;
+        ctx.height = 950;
+
+        var elevators = {};
+        var floors = {};
+        var elevatorsNumber = 0;
+        var floorsNumber = 0;
+
+        function drawBuilding(elevatorsNumber, floorsNumber) {
+          ctx.beginPath();
+          for (let elevator = 0; elevator <= elevatorsNumber; elevator++) {
+            ctx.moveTo(x + elevator * width * px, y);
+            ctx.lineTo(x + elevator * width * px, y + floorsNumber * height * px);
+          }
+
+          ctx.moveTo(x + elevatorsNumber * width * px + 40 * px, y);
+          ctx.lineTo(x + elevatorsNumber * width * px + 40 * px, y + floorsNumber * height * px);
+
+          for (let floor = 0; floor <= floorsNumber; floor++) {
+            ctx.moveTo(x, y + floor * height * px);
+            ctx.lineTo(x + elevatorsNumber * width * px + 40 * px, y + floor * height * px);
+          }
+
+          ctx.fillStyle = "black";
+          ctx.font = "24px serif";
+          for (let floor = 0; floor <= floorsNumber; floor++) {         
+            for (let elevator = 0; elevator < elevatorsNumber; elevator++) {
+              ctx.fillText(floorsNumber - floor, x + elevator * width * px + 4.3 * px, y + floor * height * px + 5.5 * px);
+            }
+          }
+
+          ctx.stroke();
+        }
+
+        function drawElevators(elevators, floorsNumber) {
+          if (Object.keys(elevators).length === 0) {
+            return;
+          }
+
+          function drawElevator(number, floor) {
+            ctx.fillStyle = "#ccc";
+            ctx.fillRect(x + (number - 1) * width * px, y + (floorsNumber * height - floor) * px, width * px, height * px);
+            ctx.fillStyle = "#000";
+            ctx.strokeRect(x + (number - 1) * width * px, y + (floorsNumber * height - floor) * px, width * px, height * px);
+          }
+
+          for (const [number, elevator] of Object.entries(elevators)) {
+            drawElevator(number, elevator.floor);
+            drawUsers(x + (number - 1) * width * px, y + (floorsNumber * height - elevator.floor + height) * px, elevator.users, 5);
+          }
+        }
+
+        function drawUsers(baseX, baseY, users, limit) {
+          function drawUser(baseX, baseY, user) {
+            if (user.from > user.to) {
+              ctx.fillStyle = "red";
+            } else {
+              ctx.fillStyle = "green";
+            }
+
+            ctx.font = "17px serif";
+            ctx.fillText(user.from + "" + user.to, baseX + 0.1 * px, baseY - 0.4 * px);
+
+            ctx.strokeRect(baseX, baseY - 2 * px, 2 * px, 2 * px);
+            ctx.fillStyle = "#000";
+          }
+
+          let relX = baseX;
+          let relY = baseY;
+          let i = 1;
+          for (const [id, user] of Object.entries(users)) {
+            drawUser(relX, relY, user);
+            if (i % limit == 0) {
+              relY -= 2 * px;
+              relX -= limit * (2 * px);
+            }
+            relX += 2 * px;
+            i += 1;
+          }
+        }
+
+        function drawFloorUsers(floors, elevatorsNumber) {
+          for (const [floorNumber, floor] of Object.entries(floors)) {
+            drawUsers(x + elevatorsNumber * width * px, y + (floorsNumber * height - floorNumber * height + height) * px, floor.waiting, 7);
+            drawUsers(x + elevatorsNumber * width * px + 26 * px, y + (floorsNumber * height - floorNumber * height + height) * px, floor.finished, 7);
+          }
+        }
+
+        let socket = new WebSocket("ws://localhost:12346/ws");
+
+        socket.onopen = function(e) {
+          console.log("[open] Соединение установлено");
+        };
+
+        socket.onmessage = function(event) {
+          console.log(`[message] Данные получены с сервера: ${event.data}`);
+          let data = JSON.parse(event.data);
+
+          if (data.type == "setup") {
+            elevatorsNumber = data.elevatorNumber;
+            floorsNumber = data.floorNumber;
+
+            for (let e = 1; e <= elevatorsNumber; e++) {
+              elevators[e] = {floor: 10, users: {}};
+            }
+ 
+            for (let f = 1; f <= floorsNumber; f++) {
+              floors[f] = {waiting: {},finished: {}};
+            }
+
+            drawBuilding(elevatorsNumber, floorsNumber);
+            drawElevators(elevators, floorsNumber);
+          }
+
+          if (data.type == "tick" && Object.keys(elevators).length !== 0 && Object.keys(floors).length !== 0 && typeof elevatorsNumber !== "undefined" && typeof floorsNumber !== "undefined") {
+            for (const [id, elevator] of Object.entries(data.elevators)) {
+              elevators[id].floor = elevator.floor;
+            }
+
+            for (const [id, user] of Object.entries(data.users)) {
+              if (user.status == "waiting") {
+                floors[user.from].waiting[id] = {from: user.from, to: user.to};
+              }
+
+              if (user.status == "ride") {
+                delete floors[user.from].waiting[id];
+                elevators[user.elevator].users[id] = {from: user.from, to: user.to}
+              }
+
+              if (user.status == "finished") {
+                delete elevators[user.elevator].users[id];
+                floors[user.to].finished[id] = {from: user.from, to: user.to};
+              }
+            }
+
+            ctx.clearRect(0, 0, ctx.width, ctx.height);
+            drawBuilding(elevatorsNumber, floorsNumber);
+            drawElevators(elevators, floorsNumber);
+            drawFloorUsers(floors, elevatorsNumber);
+          }
+        };
+
+        socket.onclose = function(event) {
+          if (event.wasClean) {
+            console.log(`[close] Соединение закрыто чисто, код=${event.code} причина=${event.reason}`);
+          } else {
+            console.log('[close] Соединение прервано');
+          }
+        };
+
+        socket.onerror = function(error) {
+          console.log(`[error] ${error.message}`);
+        };
+      }
+    </script>
+  </head>
+
+  <body onload="load();">
+    <canvas id="elevator" width="1280" height="950"></canvas>
+  </body>
+</html> 
