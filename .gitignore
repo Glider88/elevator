@@ -13,3 +13,4 @@ target/
 
 .metals
 .bloop
+.bsp
