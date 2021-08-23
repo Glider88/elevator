@@ -3,21 +3,16 @@ package actor.functional_style
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.ActorRef
-//import akka.actor.typed.scaladsl.ActorContext
-import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws._
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
 import akka.http.scaladsl.server.Directives._
 import scala.concurrent.duration._
-// import scala.io.StdIn
 import akka.stream.OverflowStrategy
-//import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
-//import akka.stream.SystemMaterializer
-//import akka.actor.ClassicActorSystemProvider
+import akka.stream.typed.scaladsl.ActorSource
+import akka.stream.Materializer
 
 object UI {
   sealed trait Command
@@ -33,27 +28,31 @@ object UI {
   final case class ElevatorState(floor: Int)
 
   def apply(): Behavior[UI.Command] = {
-    implicit val system = ActorSystem()
-    implicit val materializer = ActorMaterializer()
-    //SystemMaterializer(implicitly[ClassicActorSystemProvider].classicSystem).materializer
+    Behaviors.setup { context =>
+      implicit val system = akka.actor.ActorSystem()
+      implicit val materializer = Materializer(context)
 
-    val (wsActor, wsSource) = Source.actorRef[Message](32, OverflowStrategy.dropHead).preMaterialize()
-    val flow = Flow.fromSinkAndSource(Sink.ignore, wsSource)
+      val (wsActor, wsSource) = ActorSource.actorRef[Message](
+        PartialFunction.empty,
+        PartialFunction.empty,
+        bufferSize = 32,
+        overflowStrategy = OverflowStrategy.dropHead
+      ).preMaterialize()
 
-    val route = path("ws")(handleWebSocketMessages(flow))
-    val _ = Http().bindAndHandle(route, "localhost", 12346)
+      val flow = Flow.fromSinkAndSource(Sink.ignore, wsSource)
+      val route = path("ws")(handleWebSocketMessages(flow))
+      val _ = Http().newServerAt("localhost", 12346).bindFlow(route)
 
-    Behaviors.setup { _ =>
       Behaviors.withTimers { timers =>
         timers.startTimerWithFixedDelay(UI.Tick, 30.milliseconds)
-        val ui = new UI(wsActor)//, context)
+        val ui = new UI(wsActor)
         ui.nextBehavior(Map.empty[Int, ElevatorState], Map.empty[String, UserState], Map.empty[ActorRef[Elevator.Command], Int])
       }
     }
   }
 }
 
-class UI private (wsActor: akka.actor.ActorRef)//, context: ActorContext[UI.Command])
+class UI private (wsActor: ActorRef[Message])
 {
   import UI._
 

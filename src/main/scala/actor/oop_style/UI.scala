@@ -5,18 +5,16 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.scaladsl.AbstractBehavior
-import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws._
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
 import akka.http.scaladsl.server.Directives._
 import scala.concurrent.duration._
-//import scala.io.StdIn
 import akka.stream.OverflowStrategy
-//import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
+import akka.stream.typed.scaladsl.ActorSource
+import akka.stream.Materializer
 
 object UI {
   sealed trait Command
@@ -32,16 +30,21 @@ object UI {
   final case class ElevatorState(floor: Int)
 
   def apply(): Behavior[UI.Command] = {
-    implicit val system = ActorSystem()
-    implicit val materializer = ActorMaterializer()
-
-    val (wsActor, wsSource) = Source.actorRef[Message](32, OverflowStrategy.dropHead).preMaterialize()
-    val flow = Flow.fromSinkAndSource(Sink.ignore, wsSource)
-
-    val route = path("ws")(handleWebSocketMessages(flow))
-    val _ = Http().bindAndHandle(route, "localhost", 12346)
-
     Behaviors.setup { context =>
+      implicit val system = akka.actor.ActorSystem()
+      implicit val materializer = Materializer(context)
+
+      val (wsActor, wsSource) = ActorSource.actorRef[Message](
+        PartialFunction.empty,
+        PartialFunction.empty,
+        bufferSize = 32,
+        overflowStrategy = OverflowStrategy.dropHead
+      ).preMaterialize()
+
+      val flow = Flow.fromSinkAndSource(Sink.ignore, wsSource)
+      val route = path("ws")(handleWebSocketMessages(flow))
+      val _ = Http().newServerAt("localhost", 12346).bindFlow(route)
+
       Behaviors.withTimers { timers =>
         timers.startTimerWithFixedDelay(UI.Tick, 30.milliseconds)
         new UI(context, wsActor)
@@ -52,10 +55,10 @@ object UI {
 
 class UI(
   context: ActorContext[UI.Command],
-  wsActor: akka.actor.ActorRef
+  wsActor: ActorRef[Message]
 ) extends AbstractBehavior[UI.Command](context) {
   import UI._
-    
+
   var elevatorMap = Map.empty[Int, ElevatorState]
   var userMap = Map.empty[String, UserState]
   var elevatorToNumber = Map.empty[ActorRef[Elevator.Command], Int]
