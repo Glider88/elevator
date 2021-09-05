@@ -1,4 +1,4 @@
-package cats
+package catz.application
 
 import cats.effect.kernel.{Ref, Sync}
 import cats.syntax.functor._

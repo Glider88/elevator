@@ -7,63 +7,109 @@
     </style>
     <script>
       function load() {
-        var x = 100;
-        var y = 25;
-        var px = 10;
-        var height = 10;
-        var width = 10;
+        const x = 100;
+        const y = 25;
+        const px = 10;
+        const elevatorHeight = 10 * px;
+        const elevatorWidth = 10 * px;
+        const floorWidth = 40 * px;
+        const userWidth = 2 * px;
+        const userHeight = 2 * px;
+        const userWidthFloorLimit = 7;
+        const userWidthElevatorLimit = elevatorWidth / userWidth;
+
         var canvas = document.getElementById("elevator");
         var ctx = canvas.getContext("2d");
-
         ctx.width = 1280;
         ctx.height = 950;
 
+        let charWidth = (function mkCharWidthFn() {
+          let context = document.createElement("canvas").getContext("2d");
+
+          return function(font) {
+            context.font = font;
+            let width = context.measureText("0").width;
+
+            return Math.ceil(width);
+          };
+        })();
+
+        const elevatorNumberFont = "24px serif";
+        const halfElevatorChar = charWidth(elevatorNumberFont) / 2;
+
+        const userNumbersFont = "17px serif";
+        const halfUserChar = charWidth(userNumbersFont) / 2;
+
+        var setup = {elevatorsNumber: 0, floorsNumber: 0};
         var elevators = {};
         var floors = {};
-        var elevatorsNumber = 0;
-        var floorsNumber = 0;
 
-        function drawBuilding(elevatorsNumber, floorsNumber) {
+        function elevatorsWidth(setup) {
+          return setup.elevatorsNumber * elevatorWidth
+        }
+
+        function floorsHeight(setup) {
+          return setup.floorsNumber * elevatorHeight
+        }
+
+        function drawBuilding(setup) {
           ctx.beginPath();
-          for (let elevator = 0; elevator <= elevatorsNumber; elevator++) {
-            ctx.moveTo(x + elevator * width * px, y);
-            ctx.lineTo(x + elevator * width * px, y + floorsNumber * height * px);
+          // vertical elevator lines
+          for (let elevator = 0; elevator <= setup.elevatorsNumber; elevator++) {
+            ctx.moveTo(x + elevator * elevatorWidth, y);
+            ctx.lineTo(x + elevator * elevatorWidth, y + floorsHeight(setup));
           }
 
-          ctx.moveTo(x + elevatorsNumber * width * px + 40 * px, y);
-          ctx.lineTo(x + elevatorsNumber * width * px + 40 * px, y + floorsNumber * height * px);
+          // last right vertical line
+          ctx.moveTo(x + elevatorsWidth(setup) + floorWidth, y);
+          ctx.lineTo(x + elevatorsWidth(setup) + floorWidth, y + floorsHeight(setup));
 
-          for (let floor = 0; floor <= floorsNumber; floor++) {
-            ctx.moveTo(x, y + floor * height * px);
-            ctx.lineTo(x + elevatorsNumber * width * px + 40 * px, y + floor * height * px);
+          // horizontal lines
+          for (let floor = 0; floor <= setup.floorsNumber; floor++) {
+            ctx.moveTo(x, y + floor * elevatorHeight);
+            ctx.lineTo(x + elevatorsWidth(setup) + floorWidth, y + floor * elevatorHeight);
           }
 
+          // elevator numbers
           ctx.fillStyle = "black";
-          ctx.font = "24px serif";
-          for (let floor = 0; floor <= floorsNumber; floor++) {         
-            for (let elevator = 0; elevator < elevatorsNumber; elevator++) {
-              ctx.fillText(floorsNumber - floor, x + elevator * width * px + 4.3 * px, y + floor * height * px + 5.5 * px);
+          ctx.font = elevatorNumberFont;
+          for (let floor = 0; floor <= setup.floorsNumber; floor++) {         
+            for (let elevator = 0; elevator < setup.elevatorsNumber; elevator++) {
+              ctx.fillText(
+                setup.floorsNumber - floor,
+                x + elevator * elevatorWidth + (elevatorWidth / 2 - halfElevatorChar),
+                y + floor * elevatorHeight + (elevatorHeight / 2 + halfElevatorChar)
+              );
             }
           }
 
           ctx.stroke();
         }
 
-        function drawElevators(elevators, floorsNumber) {
+        function invertY(yFromTop, setup) {
+            return floorsHeight(setup) - yFromTop
+        }
+
+        function drawElevators(elevators, setup) {
           if (Object.keys(elevators).length === 0) {
             return;
           }
 
           function drawElevator(number, floor) {
             ctx.fillStyle = "#ccc";
-            ctx.fillRect(x + (number - 1) * width * px, y + (floorsNumber * height - floor) * px, width * px, height * px);
+            ctx.fillRect(x + (number - 1) * elevatorWidth, y + invertY(floor * elevatorHeight, setup), elevatorWidth, elevatorHeight);
             ctx.fillStyle = "#000";
-            ctx.strokeRect(x + (number - 1) * width * px, y + (floorsNumber * height - floor) * px, width * px, height * px);
+            ctx.strokeRect(x + (number - 1) * elevatorWidth, y + invertY(floor * elevatorHeight, setup), elevatorWidth, elevatorHeight);
           }
 
           for (const [number, elevator] of Object.entries(elevators)) {
             drawElevator(number, elevator.floor);
-            drawUsers(x + (number - 1) * width * px, y + (floorsNumber * height - elevator.floor + height) * px, elevator.users, 5);
+            drawUsers(
+              x + (number - 1) * elevatorWidth,
+              y + invertY((elevator.floor - 1.0) * elevatorHeight, setup),
+              elevator.users,
+              userWidthElevatorLimit
+            );
           }
         }
 
@@ -75,10 +121,14 @@
               ctx.fillStyle = "green";
             }
 
-            ctx.font = "17px serif";
-            ctx.fillText(user.from + "" + user.to, baseX + 0.1 * px, baseY - 0.4 * px);
+            ctx.font = userNumbersFont;
+            ctx.fillText(
+              user.from + "" + user.to,
+              baseX + userWidth / 2 - halfUserChar * 2,
+              baseY - userHeight / 2 + halfUserChar
+            );
 
-            ctx.strokeRect(baseX, baseY - 2 * px, 2 * px, 2 * px);
+            ctx.strokeRect(baseX, baseY - userHeight, userWidth, userHeight);
             ctx.fillStyle = "#000";
           }
 
@@ -88,18 +138,28 @@
           for (const [id, user] of Object.entries(users)) {
             drawUser(relX, relY, user);
             if (i % limit == 0) {
-              relY -= 2 * px;
-              relX -= limit * (2 * px);
+              relY -= userHeight;
+              relX -= limit * userWidth;
             }
-            relX += 2 * px;
+            relX += userWidth;
             i += 1;
           }
         }
 
-        function drawFloorUsers(floors, elevatorsNumber) {
+        function drawFloorUsers(floors, setup) {
           for (const [floorNumber, floor] of Object.entries(floors)) {
-            drawUsers(x + elevatorsNumber * width * px, y + (floorsNumber * height - floorNumber * height + height) * px, floor.waiting, 7);
-            drawUsers(x + elevatorsNumber * width * px + 26 * px, y + (floorsNumber * height - floorNumber * height + height) * px, floor.finished, 7);
+            drawUsers(
+              x + elevatorsWidth(setup),
+              y + invertY((floorNumber - 1) * elevatorHeight, setup),
+              floor.waiting,
+              userWidthFloorLimit
+            );
+            drawUsers(
+              x + elevatorsWidth(setup) + floorWidth - userWidthFloorLimit * userWidth,
+              y + invertY((floorNumber - 1) * elevatorHeight, setup),
+              floor.finished,
+              userWidthFloorLimit
+            );
           }
         }
 
@@ -114,24 +174,24 @@
           let data = JSON.parse(event.data);
 
           if (data.type == "setup") {
-            elevatorsNumber = data.elevatorNumber;
-            floorsNumber = data.floorNumber;
+            setup.elevatorsNumber = data.elevatorNumber;
+            setup.floorsNumber = data.floorNumber;
 
-            for (let e = 1; e <= elevatorsNumber; e++) {
-              elevators[e] = {floor: 10, users: {}};
+            for (let e = 1; e <= setup.elevatorsNumber; e++) {
+              elevators[e] = {floor: 1.0, users: {}};
             }
  
-            for (let f = 1; f <= floorsNumber; f++) {
-              floors[f] = {waiting: {},finished: {}};
+            for (let f = 1; f <= setup.floorsNumber; f++) {
+              floors[f] = {waiting: {}, finished: {}};
             }
 
-            drawBuilding(elevatorsNumber, floorsNumber);
-            drawElevators(elevators, floorsNumber);
+            drawBuilding(setup);
+            drawElevators(elevators, setup);
           }
 
-          if (data.type == "tick" && Object.keys(elevators).length !== 0 && Object.keys(floors).length !== 0 && typeof elevatorsNumber !== "undefined" && typeof floorsNumber !== "undefined") {
+          if (data.type == "tick" && Object.keys(elevators).length !== 0 && Object.keys(floors).length !== 0) {
             for (const [id, elevator] of Object.entries(data.elevators)) {
-              elevators[id].floor = elevator.floor;
+              elevators[id].floor = elevator.floor / 10;
             }
 
             for (const [id, user] of Object.entries(data.users)) {
@@ -151,9 +211,9 @@
             }
 
             ctx.clearRect(0, 0, ctx.width, ctx.height);
-            drawBuilding(elevatorsNumber, floorsNumber);
-            drawElevators(elevators, floorsNumber);
-            drawFloorUsers(floors, elevatorsNumber);
+            drawBuilding(setup);
+            drawElevators(elevators, setup);
+            drawFloorUsers(floors, setup);
           }
         };
 

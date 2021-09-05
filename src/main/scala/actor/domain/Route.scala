@@ -76,7 +76,7 @@ final case class Route(forward: Option[Way], backward: Option[Way], tail: Option
     val path = pairs.foldLeft(0)((acc, pair) => acc + math.abs(pair._1 - pair._2))
     val stops = userFloors.size
 
-    path + stops * 30 // todo: refactor 30, and use left stop time?
+    path + stops * 30
   }
 
   override def toString = {
