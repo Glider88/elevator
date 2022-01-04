@@ -18,6 +18,8 @@
         const userWidthFloorLimit = 7;
         const userWidthElevatorLimit = elevatorWidth / userWidth;
 
+        const websocketUrl = "ws://localhost:12346/ws";
+
         var canvas = document.getElementById("elevator");
         var ctx = canvas.getContext("2d");
         ctx.width = 1280;
@@ -163,71 +165,81 @@
           }
         }
 
-        let socket = new WebSocket("ws://localhost:12346/ws");
+        function connect(socket) {
+          socket.onopen = function(e) {
+            console.log("[open] Соединение установлено");
+          };
 
-        socket.onopen = function(e) {
-          console.log("[open] Соединение установлено");
-        };
+          socket.onerror = function(error) {
+            console.log(`[error] ${error.message}`);
+            setTimeout(
+              function() {
+                let newSocket = new WebSocket(websocketUrl);
+                connect(newSocket);
+              },
+              1000
+            );
+          };
 
-        socket.onmessage = function(event) {
-          console.log(`[message] Данные получены с сервера: ${event.data}`);
-          let data = JSON.parse(event.data);
+          socket.onmessage = function(event) {
+            console.log(`[message] Данные получены с сервера: ${event.data}`);
+            let data = JSON.parse(event.data);
 
-          if (data.type == "setup") {
-            setup.elevatorsNumber = data.elevatorNumber;
-            setup.floorsNumber = data.floorNumber;
+            if (data.type == "setup") {
+              setup.elevatorsNumber = data.elevatorNumber;
+              setup.floorsNumber = data.floorNumber;
 
-            for (let e = 1; e <= setup.elevatorsNumber; e++) {
-              elevators[e] = {floor: 1.0, users: {}};
-            }
- 
-            for (let f = 1; f <= setup.floorsNumber; f++) {
-              floors[f] = {waiting: {}, finished: {}};
-            }
-
-            drawBuilding(setup);
-            drawElevators(elevators, setup);
-          }
-
-          if (data.type == "tick" && Object.keys(elevators).length !== 0 && Object.keys(floors).length !== 0) {
-            for (const [id, elevator] of Object.entries(data.elevators)) {
-              elevators[id].floor = elevator.floor / 10;
-            }
-
-            for (const [id, user] of Object.entries(data.users)) {
-              if (user.status == "waiting") {
-                floors[user.from].waiting[id] = {from: user.from, to: user.to};
+              for (let e = 1; e <= setup.elevatorsNumber; e++) {
+                elevators[e] = {floor: 1.0, users: {}};
               }
 
-              if (user.status == "ride") {
-                delete floors[user.from].waiting[id];
-                elevators[user.elevator].users[id] = {from: user.from, to: user.to}
+              for (let f = 1; f <= setup.floorsNumber; f++) {
+                floors[f] = {waiting: {}, finished: {}};
               }
 
-              if (user.status == "finished") {
-                delete elevators[user.elevator].users[id];
-                floors[user.to].finished[id] = {from: user.from, to: user.to};
-              }
+              drawBuilding(setup);
+              drawElevators(elevators, setup);
             }
 
-            ctx.clearRect(0, 0, ctx.width, ctx.height);
-            drawBuilding(setup);
-            drawElevators(elevators, setup);
-            drawFloorUsers(floors, setup);
-          }
-        };
+            if (data.type == "tick" && Object.keys(elevators).length !== 0 && Object.keys(floors).length !== 0) {
+              for (const [id, elevator] of Object.entries(data.elevators)) {
+                elevators[id].floor = elevator.floor / 10;
+              }
 
-        socket.onclose = function(event) {
-          if (event.wasClean) {
-            console.log(`[close] Соединение закрыто чисто, код=${event.code} причина=${event.reason}`);
-          } else {
-            console.log('[close] Соединение прервано');
-          }
-        };
+              for (const [id, user] of Object.entries(data.users)) {
+                if (user.status == "waiting") {
+                  floors[user.from].waiting[id] = {from: user.from, to: user.to};
+                }
 
-        socket.onerror = function(error) {
-          console.log(`[error] ${error.message}`);
-        };
+                if (user.status == "ride") {
+                  delete floors[user.from].waiting[id];
+                  elevators[user.elevator].users[id] = {from: user.from, to: user.to}
+                }
+
+                if (user.status == "finished") {
+                  delete elevators[user.elevator].users[id];
+                  floors[user.to].finished[id] = {from: user.from, to: user.to};
+                }
+              }
+
+              ctx.clearRect(0, 0, ctx.width, ctx.height);
+              drawBuilding(setup);
+              drawElevators(elevators, setup);
+              drawFloorUsers(floors, setup);
+            }
+          };
+
+          socket.onclose = function(event) {
+            if (event.wasClean) {
+              console.log(`[close] Соединение закрыто чисто, код=${event.code} причина=${event.reason}`);
+            } else {
+              console.log('[close] Соединение прервано');
+            }
+          };
+        }
+       
+        let socket = new WebSocket(websocketUrl);
+        connect(socket);
       }
     </script>
   </head>
