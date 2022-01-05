@@ -13,7 +13,7 @@ import org.http4s.websocket.WebSocketFrame
 import scala.concurrent.ExecutionContext.global
 
 object Main extends IOApp with Http4sDsl[IO] {
-  def routes: HttpRoutes[IO] =
+  def routes(application: Queue[IO,Option[WebSocketFrame]] => IO[Unit]): HttpRoutes[IO] =
     HttpRoutes.of[IO] {
       case GET -> Root / "ws" =>
         Queue
@@ -21,21 +21,24 @@ object Main extends IOApp with Http4sDsl[IO] {
           .flatMap { queue =>
             val to: Stream[IO, WebSocketFrame] = Stream.fromQueueNoneTerminated(queue)
             val from: Pipe[IO, WebSocketFrame, Unit] = _.void
-
-            app(queue).start *> WebSocketBuilder[IO].build(to, from)
+            
+            application(queue).start *> WebSocketBuilder[IO].build(to, from)
           }
     }
 
   def run(args: List[String]): IO[ExitCode] = {
+    val application = args match {
+      case "monolite" :: Nil => queue => catz.application.AppMonoliteState.application(queue)
+      case "separate" :: Nil => queue => catz.application.AppSeparateState.application(queue)
+      case _ => throw new IllegalArgumentException("expected argument 'monolite' or 'separate'")
+    }
+
     BlazeServerBuilder[IO](global)
       .bindHttp(12346)
-      .withHttpApp(routes.orNotFound)
+      .withHttpApp(routes(application).orNotFound)
       .serve
       .compile
       .drain
       .as(ExitCode.Success)
   }
-
-  def app(queue: Queue[IO, Option[WebSocketFrame]]) = catz.application.AppMonoliteState.application(queue)
-  // def app(queue: Queue[IO, Option[WebSocketFrame]]) = catz.application.AppSeparateState.application(queue)
 }
