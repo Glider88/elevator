@@ -31,6 +31,7 @@
 
 # vscode
 /.vscode
+/.history
 
 # Standard symbolic link to build/quick/bin
 /qbin
