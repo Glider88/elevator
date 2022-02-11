@@ -16,7 +16,7 @@ object Floor {
         timers.startSingleTimer(GenerateNewUser, Random.between(3, 30).seconds)
         Behaviors.receiveMessage {
           case GenerateNewUser =>
-            //context.log.info(s"receive Floor.GenerateNewUser")
+            context.log.debug(s"Received Floor.GenerateNewUser")
             def randomIntExclude(from: Int, to: Int, exclude: Int): Int = {
               val random = Random.between(from, to)
               if (random == exclude) {

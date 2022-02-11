@@ -3,8 +3,6 @@ package actor.functional_style
 import akka.actor.typed.ActorRef
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
-//import scala.collection.immutable.SortedSet
-//import akka.actor.typed.scaladsl.ActorContext
 import actor.domain._
 import scala.concurrent.duration._
 
@@ -18,7 +16,7 @@ object Elevator {
     Behaviors.setup { _ =>
       Behaviors.withTimers { timers =>
         timers.startTimerWithFixedDelay(Tick, 30.milliseconds)
-        val elevator = new Elevator(/*context, */ui, system, elevatorNumber)
+        val elevator = new Elevator(ui, system, elevatorNumber)
         elevator.nextBehavior(Route(), 10, 0, false)
       }
     }
@@ -26,7 +24,6 @@ object Elevator {
 }
 
 class Elevator private (
-  //context: ActorContext[Elevator.Command],
   ui: ActorRef[UI.Command],
   system: ActorRef[System.Command],
   elevatorNumber: Int
@@ -42,7 +39,7 @@ class Elevator private (
     Behaviors.receive { (context, message) =>
       message match {
         case CalculateDistanceDiff(newRide, affectedRides, replyTo) =>
-          //context.log.info(s"receive Elevator.CalculateDistanceDiff($newRide, $affectedRides, $replyTo)")
+          context.log.debug(s"Received Elevator.CalculateDistanceDiff($newRide, $affectedRides, $replyTo)")
           val normalNewRide = Ride(newRide.start * 10, newRide.end * 10)
           val normalEffectedRides = affectedRides.map(r => Ride(r.start * 10, r.end * 10))
 
@@ -58,7 +55,7 @@ class Elevator private (
           Behaviors.same
 
         case AddRide(ride) =>
-          //context.log.info(s"receive Elevator.AddRide($ride)")
+          context.log.debug(s"Received Elevator.AddRide($ride)")
           val normalRide = Ride(ride.start * 10, ride.end * 10)
           val newRoute = route.addRide(currentFloor, normalRide)
           nextBehavior(newRoute, currentFloor, stopTime, afterStop)

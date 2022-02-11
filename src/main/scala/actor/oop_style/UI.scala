@@ -66,16 +66,16 @@ class UI(
   override def onMessage(msg: UI.Command): Behavior[UI.Command] = {
     msg match {
       case Setup(numberToElevator, numberToFloor) =>
-        //context.log.info(s"receive UI.Setup($numberToElevator, $numberToFloor)")
+        context.log.debug(s"Received UI.Setup($numberToElevator, $numberToFloor)")
         wsActor ! TextMessage(SetupRequest(numberToElevator.size, numberToFloor.size).asJson.noSpaces)
         elevatorToNumber = numberToElevator.map(_.swap)
         this
       case ElevatorCommand(id, floor) =>
-        //context.log.info(s"receive UI.ElevatorCommand($id, $floor)")
+        context.log.debug(s"Received UI.ElevatorCommand($id, $floor)")
         elevatorMap = elevatorMap + (id -> ElevatorState(floor))
         this
       case UserCommand(id, from, to, status, elevator) =>
-        //context.log.info(s"receive UI.UserCommand($id, $from, $to, $status. $elevator)")
+        context.log.debug(s"Received UI.UserCommand($id, $from, $to, $status. $elevator)")
         val elevatorNumber = elevator match {
           case Some(e) => {
             elevatorToNumber.get(e) match {
@@ -94,7 +94,7 @@ class UI(
         userMap = userMap + (id -> UserState(from, to, status, elevatorNumber))
         this
       case Tick =>
-        //context.log.info(s"receive UI.Tick($elevatorMap, $userMap)")
+        context.log.debug(s"Received UI.Tick($elevatorMap, $userMap)")
         wsActor ! TextMessage(StateRequest(elevatorMap, userMap).asJson.noSpaces)
         userMap = Map.empty[String, UserState]
         elevatorMap = Map.empty[Int, ElevatorState]

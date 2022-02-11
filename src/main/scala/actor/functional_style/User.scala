@@ -3,9 +3,7 @@ package actor.functional_style
 import akka.actor.typed.ActorRef
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
-//import actor.domain.Route
 import actor.domain.Ride
-//import akka.NotUsed
 
 object User {
   sealed trait Command
@@ -36,18 +34,18 @@ class User private (
     Behaviors.setup { context =>
       Behaviors.receiveMessage {
         case MatchedEvelator(elevator) =>
-          //context.log.info(s"receive User.MatchedEvelator: $elevator")
+          context.log.debug(s"Received User.MatchedEvelator: $elevator")
           nextBehavior(Some(elevator), pickedElevator)
         case Boarding(elevator) =>
-          //context.log.info(s"receive User.Boarding: $elevator")
+          context.log.debug(s"Received User.Boarding: $elevator")
           ui ! UI.UserCommand(name, startFloor, endFloor, "ride", Some(elevator))
           nextBehavior(matchedElevator, Some(elevator))
         case UnBoarding(elevator) =>
-          //context.log.info(s"receive User.UnBoarding: $elevator")
+          context.log.debug(s"Received User.UnBoarding: $elevator")
           ui ! UI.UserCommand(name, startFloor, endFloor, "finished", Some(elevator))
           nextBehavior(Option.empty[ActorRef[Elevator.Command]], Option.empty[ActorRef[Elevator.Command]])
         case ElevatorArrived(floor, elevator) =>
-          // context.log.info(s"receive User.ElevatorArrived(floor: $floor, elevator: $elevator) state: (start: $startFloor, end: $endFloor, match: $matchedElevator, pick: $pickedElevator)")
+          context.log.debug(s"Received User.ElevatorArrived(floor: $floor, elevator: $elevator) state: (start: $startFloor, end: $endFloor, match: $matchedElevator, pick: $pickedElevator)")
           if (floor == startFloor && elevator == matchedElevator.getOrElse(false)) {
             context.self ! Boarding(elevator)
           }
@@ -58,7 +56,7 @@ class User private (
 
           Behaviors.same
         case RequestAffectedElevator(replyTo) => 
-          // context.log.info(s"receive User.RequestAffectedElevator($replyTo)")
+          context.log.debug(s"Received User.RequestAffectedElevator($replyTo)")
           val affected = if (pickedElevator.isDefined) pickedElevator else matchedElevator
           replyTo ! AffectedElevator(context.self, Ride(startFloor, endFloor), affected)
           

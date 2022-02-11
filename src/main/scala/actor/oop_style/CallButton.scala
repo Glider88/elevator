@@ -27,11 +27,11 @@ class CallButton(
   override def onMessage(msg: CallButton.Command): Behavior[CallButton.Command] = {
     msg match {
       case CallElevator(user, requiredFloor) =>
-        //context.log.info(s"receive CallButton.CallElevator($user, $requiredFloor)")
+        context.log.debug(s"Received CallButton.CallElevator($user, $requiredFloor)")
         system ! System.CallElevator(user, Ride(currentFloor, requiredFloor), context.self)
         this
       case ProperElevator(user, elevator, ride) =>
-        //context.log.info(s"receive CallButton.ProperElevator($user, $elevator, $ride)")
+        context.log.debug(s"Received CallButton.ProperElevator($user, $elevator, $ride)")
         user ! User.MatchedEvelator(elevator)
         elevator ! Elevator.AddRide(ride)
         this

@@ -59,7 +59,7 @@ object System {
     override def onMessage(msg: User.AffectedElevator): Behavior[User.AffectedElevator] = {
       msg match {
         case a: User.AffectedElevator =>
-          //context.log.info(s"receive System.affectedUsersActor.AffectedElevator($a)")
+          context.log.debug(s"Received System.affectedUsersActor.AffectedElevator($a)")
           val newUserProgress = userProgress + (a.user -> Some(a))
           if (newUserProgress.values.filter(_.isEmpty).isEmpty) {
             val affectedElevators = newUserProgress.values.flatten
@@ -101,7 +101,7 @@ object System {
     override def onMessage(msg: System.DiffCommand): Behavior[System.DiffCommand] = {
       msg match {
         case ElevatorAndAffectedRides(elevator2rides) =>
-          //context.log.info(s"receive System.elevatorDistanceDiffActor.ElevatorAndAffectedRides($elevator2rides)")
+          context.log.debug(s"Received System.elevatorDistanceDiffActor.ElevatorAndAffectedRides($elevator2rides)")
           elevators.foreach(elevator => {
             elevator2rides.get(elevator) match {
               case Some(rides) => elevator ! Elevator.CalculateDistanceDiff(newRide, rides, context.self)
@@ -111,7 +111,7 @@ object System {
 
           this
         case dd: DistanceDiff =>
-          //context.log.info(s"receive System.elevatorDistanceDiffActor.$dd")
+          context.log.debug(s"Received System.elevatorDistanceDiffActor.$dd")
           val newElevatorProgress = elevatorProgress + (dd.elevator -> Some(dd))
           if (newElevatorProgress.values.filter(_.isEmpty).isEmpty) {
             val distanceDiffs = newElevatorProgress.values.flatten
@@ -154,19 +154,19 @@ class System (
   override def onMessage(msg: System.Command): Behavior[System.Command] = {
     msg match {
       case ElevatorArrived(floor, elevator) =>
-        //context.log.info(s"receive System.ElevatorArrived($floor, $elevator)")
+        context.log.debug(s"Received System.ElevatorArrived($floor, $elevator)")
         users.foreach(_ ! User.ElevatorArrived(floor, elevator))
         this
       case RegisterNewUser(user) =>
-        //context.log.info(s"receive System.RegisterNewUser: $user")
+        context.log.debug(s"Received System.RegisterNewUser: $user")
         users = users + user
         this
       case DeleteUser(user) =>
-        //context.log.info(s"receive System.DeleteUser: $user")
+        context.log.debug(s"Received System.DeleteUser: $user")
         users = users - user
         this
       case CallElevator(user, newRide, replyTo) =>
-        //context.log.info(s"receive System.CallElevator($user, $newRide, $replyTo)")
+        context.log.debug(s"Received System.CallElevator($user, $newRide, $replyTo)")
         val name = randomString(10)
         val elevatorDistanceDiff = context.spawn(
           Behaviors.setup(context => new ElevatorDistanceDiffActor(context, user, elevators, newRide, replyTo)),

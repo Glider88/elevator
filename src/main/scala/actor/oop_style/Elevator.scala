@@ -5,10 +5,8 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.AbstractBehavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.ActorContext
-//import scala.collection.immutable.SortedSet
 import actor.domain._
 import scala.concurrent.duration._
-//import akka.actor.typed.scaladsl.TimerScheduler
 
 object Elevator {
   sealed trait Command
@@ -42,7 +40,7 @@ class Elevator (
   override def onMessage(msg: Elevator.Command): Behavior[Elevator.Command] = {
     msg match {
       case CalculateDistanceDiff(newRide, affectedRides, replyTo) =>
-        //context.log.info(s"receive Elevator.CalculateDistanceDiff($newRide, $affectedRides, $replyTo)")
+        context.log.debug(s"Received Elevator.CalculateDistanceDiff($newRide, $affectedRides, $replyTo)")
         val normalNewRide = Ride(newRide.start * 10, newRide.end * 10)
         val normalEffectedRides = affectedRides.map(r => Ride(r.start * 10, r.end * 10))
 
@@ -58,14 +56,14 @@ class Elevator (
         this
 
       case AddRide(ride) =>
-        //context.log.info(s"receive Elevator.AddRide($ride)")
+        context.log.debug(s"Received Elevator.AddRide($ride)")
         val normalRide = Ride(ride.start * 10, ride.end * 10)
         val newRoute = route.addRide(currentFloor, normalRide)
         route = newRoute
         this
 
       case Tick => {
-        //context.log.info(s"Elevator.Tick($currentFloor, $route, $stopTime, $afterStop)")
+        context.log.debug(s"Received Elevator.Tick($currentFloor, $route, $stopTime, $afterStop)")
         ui ! UI.ElevatorCommand(elevatorNumber, currentFloor)
 
         if (stopTime > 0) {

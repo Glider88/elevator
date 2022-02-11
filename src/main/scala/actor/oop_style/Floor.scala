@@ -5,7 +5,6 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.AbstractBehavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.ActorContext
-//import actor.domain._
 import scala.concurrent.duration._
 import akka.actor.typed.scaladsl.TimerScheduler
 import scala.util.Random
@@ -44,7 +43,7 @@ class Floor (
   override def onMessage(msg: Floor.Command): Behavior[Floor.Command] = {
     msg match {
       case GenerateNewUser =>
-        //context.log.info(s"receive Floor.GenerateNewUser")
+        context.log.debug(s"Received Floor.GenerateNewUser")
         def randomIntExclude(from: Int, to: Int, exclude: Int): Int = {
           val random = Random.between(from, to)
           if (random == exclude) {

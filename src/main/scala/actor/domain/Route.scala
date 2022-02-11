@@ -1,8 +1,11 @@
 package actor.domain
 
 object Route {
-  def ahead(direction: Direction, base: Int, floor: Int): Boolean = if (direction == Up) floor >= base else floor <= base
-  def apply(): Route = Route(Option.empty[Way], Option.empty[Way], Option.empty[Way])
+  def ahead(direction: Direction, base: Int, floor: Int): Boolean =
+    if (direction == Up) floor >= base else floor <= base
+
+  def apply(): Route =
+    Route(Option.empty[Way], Option.empty[Way], Option.empty[Way])
 }
 
 final case class Route(forward: Option[Way], backward: Option[Way], tail: Option[Way]) {

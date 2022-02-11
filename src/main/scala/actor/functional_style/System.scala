@@ -4,18 +4,8 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.ActorContext
-//import akka.actor.ActorSystem
-//import akka.http.scaladsl.Http
-//import akka.http.scaladsl.model.ws._
-//import akka.stream.ActorMaterializer
-//import akka.stream.scaladsl._
 import akka.http.scaladsl.server.Directives._
-//import scala.concurrent.duration._
-//import scala.io.StdIn
-//import akka.stream.OverflowStrategy
-//import actor.domain.Route
 import actor.domain.Ride
-//import akka.NotUsed
 
 object System {
   sealed trait Command
@@ -53,10 +43,10 @@ object System {
     replyTo: ActorRef[System.ElevatorAndAffectedRides]
   ): Behavior[User.AffectedElevator] = {
     def nextBehavior(userProgress: Map[ActorRef[User.Command], Option[User.AffectedElevator]]): Behavior[User.AffectedElevator] = {
-      Behaviors.setup { _ =>
+      Behaviors.setup { context =>
         Behaviors.receiveMessage {
           case a: User.AffectedElevator =>
-            //context.log.info(s"receive System.affectedUsersActor.AffectedElevator($a)")
+            context.log.debug(s"Received System.affectedUsersActor.AffectedElevator($a)")
             val newUserProgress = userProgress + (a.user -> Some(a))
             if (newUserProgress.values.filter(_.isEmpty).isEmpty) {
               val affectedElevators = newUserProgress.values.flatten
@@ -98,7 +88,7 @@ object System {
       Behaviors.setup { context =>
         Behaviors.receiveMessage {
           case ElevatorAndAffectedRides(elevator2rides) =>
-            //context.log.info(s"receive System.elevatorDistanceDiffActor.ElevatorAndAffectedRides($elevator2rides)")
+            context.log.debug(s"Received System.elevatorDistanceDiffActor.ElevatorAndAffectedRides($elevator2rides)")
             elevators.foreach(elevator => {
               elevator2rides.get(elevator) match {
                 case Some(rides) => elevator ! Elevator.CalculateDistanceDiff(newRide, rides, context.self)
@@ -108,7 +98,7 @@ object System {
 
             Behaviors.same
           case dd: DistanceDiff =>
-            //context.log.info(s"receive System.elevatorDistanceDiffActor.$dd")
+            context.log.debug(s"Received System.elevatorDistanceDiffActor.$dd")
             val newElevatorProgress = elevatorProgress + (dd.elevator -> Some(dd))
             if (newElevatorProgress.values.filter(_.isEmpty).isEmpty) {
               val distanceDiffs = newElevatorProgress.values.flatten
@@ -149,17 +139,17 @@ class System private (context: ActorContext[System.Command])
   private def nextBehavior(users: Set[ActorRef[User.Command]], elevators: Set[ActorRef[Elevator.Command]]): Behavior[System.Command] = {
     Behaviors.receiveMessage {
       case ElevatorArrived(floor, elevator) =>
-        //context.log.info(s"receive System.ElevatorArrived($floor, $elevator)")
+        context.log.debug(s"Received System.ElevatorArrived($floor, $elevator)")
         users.foreach(_ ! User.ElevatorArrived(floor, elevator))
         Behaviors.same
       case RegisterNewUser(user) =>
-        //context.log.info(s"receive System.RegisterNewUser: $user")
+        context.log.debug(s"Received System.RegisterNewUser: $user")
         nextBehavior(users + user, elevators)
       case DeleteUser(user) =>
-        //context.log.info(s"receive System.DeleteUser: $user")
+        context.log.debug(s"Received System.DeleteUser: $user")
         nextBehavior( users - user, elevators)
       case CallElevator(user, newRide, replyTo) =>
-        //context.log.info(s"receive System.CallElevator($user, $newRide, $replyTo)")
+        context.log.debug(s"Received System.CallElevator($user, $newRide, $replyTo)")
         val name = randomString(10)
         val elevatorDistanceDiff = context.spawn(elevatorDistanceDiffActor(user, elevators, newRide, replyTo), s"elevatorDistanceDiffActor-$name")
         val affectedUsers = context.spawn(affectedUsersActor(users, elevatorDistanceDiff), s"affectedUsersActor-$name")

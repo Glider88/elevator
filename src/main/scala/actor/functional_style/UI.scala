@@ -13,6 +13,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import akka.stream.typed.scaladsl.ActorSource
 import akka.stream.Materializer
+import akka.actor.typed.scaladsl.ActorContext
 
 object UI {
   sealed trait Command
@@ -46,7 +47,7 @@ object UI {
       Behaviors.withTimers { timers =>
         timers.startTimerWithFixedDelay(UI.Tick, 30.milliseconds)
         val ui = new UI(wsActor)
-        ui.nextBehavior(Map.empty[Int, ElevatorState], Map.empty[String, UserState], Map.empty[ActorRef[Elevator.Command], Int])
+        ui.nextBehavior(context, Map.empty[Int, ElevatorState], Map.empty[String, UserState], Map.empty[ActorRef[Elevator.Command], Int])
       }
     }
   }
@@ -57,20 +58,21 @@ class UI private (wsActor: ActorRef[Message])
   import UI._
 
   private def nextBehavior(
+    context: ActorContext[UI.Command],
     elevatorMap: Map[Int, ElevatorState],
     userMap: Map[String, UserState],
     elevatorToNumber: Map[ActorRef[Elevator.Command], Int]
   ): Behavior[UI.Command] = {
     Behaviors.receiveMessage {
       case Setup(numberToElevator, numberToFloor) =>
-        //context.log.info(s"receive UI.Setup($numberToElevator, $numberToFloor)")
+        context.log.debug(s"Received UI.Setup($numberToElevator, $numberToFloor)")
         wsActor ! TextMessage(SetupRequest(numberToElevator.size, numberToFloor.size).asJson.noSpaces)
-        nextBehavior(elevatorMap, userMap, numberToElevator.map(_.swap))
+        nextBehavior(context, elevatorMap, userMap, numberToElevator.map(_.swap))
       case ElevatorCommand(id, floor) =>
-        //context.log.info(s"receive UI.ElevatorCommand($id, $floor)")
-        nextBehavior(elevatorMap + (id -> ElevatorState(floor)), userMap, elevatorToNumber)
+        context.log.debug(s"Received UI.ElevatorCommand($id, $floor)")
+        nextBehavior(context, elevatorMap + (id -> ElevatorState(floor)), userMap, elevatorToNumber)
       case UserCommand(id, from, to, status, elevator) =>
-        //context.log.info(s"receive UI.UserCommand($id, $from, $to, $status. $elevator)")
+        context.log.debug(s"Received UI.UserCommand($id, $from, $to, $status. $elevator)")
         val elevatorNumber = elevator match {
           case Some(e) => {
             elevatorToNumber.get(e) match {
@@ -86,11 +88,11 @@ class UI private (wsActor: ActorRef[Message])
             Option.empty[Int]
           }
         }
-        nextBehavior(elevatorMap, userMap + (id -> UserState(from, to, status, elevatorNumber)), elevatorToNumber)
+        nextBehavior(context, elevatorMap, userMap + (id -> UserState(from, to, status, elevatorNumber)), elevatorToNumber)
       case Tick =>
-        //context.log.info(s"receive UI.Tick($elevatorMap, $userMap)")
+        context.log.debug(s"Received UI.Tick($elevatorMap, $userMap)")
         wsActor ! TextMessage(StateRequest(elevatorMap, userMap).asJson.noSpaces)
-        nextBehavior(Map.empty[Int, ElevatorState], Map.empty[String, UserState], elevatorToNumber)
+        nextBehavior(context, Map.empty[Int, ElevatorState], Map.empty[String, UserState], elevatorToNumber)
     }
   }
 }
